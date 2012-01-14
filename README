@@ -1,0 +1,4 @@
+Script converting SCPI command specification for instrument
+into C++ classed to encapsulate comand generation.
+
+Released under Apache license v 2
