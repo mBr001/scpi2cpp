@@ -5,11 +5,27 @@ from string import Template
 
 
 class ClassWriter:
+	"""Write C++ class definition and declaration into files."""
+
 	prot_private = 'private:\n'
 	prot_protected = 'protected:\n'
 	prot_public = 'public:\n'
 
 	class Item:
+		"""C++ class item, eg. function, variable, constant."""
+
+		class Declaration:
+			def __init__(self, ret_type, name):
+				self.ret_type = ret_type
+				self.name = name
+
+			def get(self, namespace = ""):
+				if namespace:
+					namespace = namespace + "::"
+				if self.ret_type:
+					return self.ret_type + " " + namespace + self.name
+				return namespace + self.name
+
 		def __init__(self, protection, declaration, definition):
 			self.declaration = declaration
 			self.definition = definition
@@ -18,12 +34,7 @@ class ClassWriter:
 	def __init__(self, name, parent = None):
 		self.name = name
 		self.parent = parent
-		if parent is None:
-			self.indent = 0
-		else:
-			self.indent = parent.indent + 1
-		self.indent0 = "\t" * self.indent
-		self.indent1 = "\t" * (self.indent + 1)
+		self.indent = 0 if parent is None else parent.indent + 1
 		self.items = []
 
 	def addItem(self, protection, declaration, definition):
@@ -45,7 +56,7 @@ class ClassWriter:
 			if i.protection != protection:
 				protection = i.protection
 				items = items + protection
-			items = items + "\t" + i.declaration + ';\n'
+			items = items + "\t" + i.declaration.get() + ';\n'
 
 		t = Template("""class ${class_name} {
 ${items}
@@ -54,17 +65,19 @@ ${items}
 		return t.substitute(class_name=self.name, items=items)
 
 	def definition(self, header_file_name):
-		t = Template("""${class_name}::${declaration}${definition}
-""")
-		items = Template("""#include "${header_file_name}"
-
-""")
+		items = Template("""#include "${header_file_name}"\n\n""")
 		items = items.substitute(header_file_name=header_file_name)
+		t = Template("${declaration}${definition}\n")
 		for i in self.items:
 			items = items + t.substitute(class_name=self.name,
-					declaration=i.declaration,
+					declaration=i.declaration.get(self.namespace()),
 					definition=i.definition)
 		return items
+
+	def namespace(self):
+		if self.parent:
+			return self.parent.namespace() + "::" + self.name
+		return self.name
 
 
 class SCPI2cpp:
@@ -82,8 +95,10 @@ classes into dest_dir."""
 		def_file_name = file_name + '.cpp'
 		fdec = open(os.path.join(dest_dir, dec_file_name), 'w')
 		fdef = open(os.path.join(dest_dir, def_file_name), 'w')
+
 		c = ClassWriter(class_name)
-		c.addItem(c.prot_public, class_name+"()", """\n{
+		c.addItem(c.prot_public, c.Item.Declaration("", class_name+"()"), """
+{
 }
 """)
 		fdec.write(c.declaration())
