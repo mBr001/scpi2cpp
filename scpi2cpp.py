@@ -5,6 +5,16 @@ from string import Template
 
 
 class ClassWriter:
+	prot_private = 'private:\n'
+	prot_protected = 'protected:\n'
+	prot_public = 'public:\n'
+
+	class Item:
+		def __init__(self, protection, declaration, definition):
+			self.declaration = declaration
+			self.definition = definition
+			self.protection = protection
+
 	def __init__(self, name, parent = None):
 		self.name = name
 		self.parent = parent
@@ -14,6 +24,10 @@ class ClassWriter:
 			self.indent = parent.indent + 1
 		self.indent0 = "\t" * self.indent
 		self.indent1 = "\t" * (self.indent + 1)
+		self.items = []
+
+	def addItem(self, protection, declaration, definition):
+		self.items.append(self.Item(protection, declaration, definition))
 
 	def addFunc(self, name, body):
 		pass
@@ -25,21 +39,32 @@ class ClassWriter:
 		return ClassWriter(name, self)
 
 	def declaration(self):
+		items = ""
+		protection = self.prot_private
+		for i in self.items:
+			if i.protection != protection:
+				protection = i.protection
+				items = items + protection
+			items = items + "\t" + i.declaration + ';\n'
+
 		t = Template("""class ${class_name} {
-public:
-	${class_name}();
+${items}
 };
 """)
-		return t.substitute(class_name=self.name)
+		return t.substitute(class_name=self.name, items=items)
 
 	def definition(self, header_file_name):
-		t = Template("""#include "${header_file_name}"
-${class_name}::${class_name}()
-{
-}
+		t = Template("""${class_name}::${declaration}${definition}
 """)
-		return t.substitute(header_file_name=header_file_name,
-				class_name=self.name)
+		items = Template("""#include "${header_file_name}"
+
+""")
+		items = items.substitute(header_file_name=header_file_name)
+		for i in self.items:
+			items = items + t.substitute(class_name=self.name,
+					declaration=i.declaration,
+					definition=i.definition)
+		return items
 
 
 class SCPI2cpp:
@@ -58,6 +83,9 @@ classes into dest_dir."""
 		fdec = open(os.path.join(dest_dir, dec_file_name), 'w')
 		fdef = open(os.path.join(dest_dir, def_file_name), 'w')
 		c = ClassWriter(class_name)
+		c.addItem(c.prot_public, class_name+"()", """\n{
+}
+""")
 		fdec.write(c.declaration())
 		fdef.write(c.definition(dec_file_name))
 
