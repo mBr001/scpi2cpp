@@ -10,6 +10,7 @@ class ClassWriter:
 	prot_private = 'private:\n'
 	prot_protected = 'protected:\n'
 	prot_public = 'public:\n'
+	protection = prot_public
 
 	class Item:
 		"""C++ class item, eg. function, variable, constant."""
@@ -27,9 +28,15 @@ class ClassWriter:
 				return namespace + self.name
 
 		def __init__(self, protection, declaration, definition):
-			self.declaration = declaration
-			self.definition = definition
+			self._declaration = declaration
+			self._definition = definition
 			self.protection = protection
+
+		def declaration(self, namespace = ""):
+			return self._declaration.get(namespace)
+
+		def definition(self):
+			return self._definition
 
 	def __init__(self, name, parent = None):
 		self.name = name
@@ -47,7 +54,9 @@ class ClassWriter:
 		pass
 
 	def addSubclass(self, name):
-		return ClassWriter(name, self)
+		c = ClassWriter(name, self)
+		self.items.append(c)
+		return c
 
 	def declaration(self):
 		items = ""
@@ -56,7 +65,7 @@ class ClassWriter:
 			if i.protection != protection:
 				protection = i.protection
 				items = items + protection
-			items = items + "\t" + i.declaration.get() + ';\n'
+			items = items + "\t" + i.declaration() + ';\n'
 
 		t = Template("""class ${class_name} {
 ${items}
@@ -64,14 +73,19 @@ ${items}
 """)
 		return t.substitute(class_name=self.name, items=items)
 
-	def definition(self, header_file_name):
-		items = Template("""#include "${header_file_name}"\n\n""")
-		items = items.substitute(header_file_name=header_file_name)
+	def definition(self, header_file_name=None):
+		items = ""
+		if not header_file_name is None:
+			items = Template("""#include "${header_file_name}"\n\n""")
+			items = items.substitute(header_file_name=header_file_name)
 		t = Template("${declaration}${definition}\n")
 		for i in self.items:
-			items = items + t.substitute(class_name=self.name,
-					declaration=i.declaration.get(self.namespace()),
-					definition=i.definition)
+			if isinstance(i ,ClassWriter):
+				items = items + i.definition()
+			else:
+				items = items + t.substitute(class_name=self.name,
+						declaration=i.declaration(self.namespace()),
+						definition=i.definition())
 		return items
 
 	def namespace(self):
@@ -130,14 +144,26 @@ classes into dest_dir."""
 {
 }
 """)
+		for name, scpi_cmd in self.scpi_cc.items():
+			subclass = c.addSubclass(name)
+			subclass.addItem(c.prot_public, c.Item.Declaration("", name+"()"), """
+{
+}
+""")
+
+		for ic in self.scpi_ic.subcmds.items():
+			print(ic)
+
 		fdec.write(c.declaration())
 		fdef.write(c.definition(dec_file_name))
 
 	def parseSpecification(self):
 		self.scpi_cc = {}
-		self.scpi_ic = {}
+		self.scpi_ic = self.SCPI_IC()
+		last_ic_cmd = []
 		for l in self.scpi_spec.splitlines():
-			if l.startswith('#'):
+			l = l.strip()
+			if l.startswith('#') or not l:
 				continue
 			if l.startswith('*'):
 				l = l[1:].strip()
@@ -159,9 +185,45 @@ classes into dest_dir."""
 						cmd.setQuery(False)
 					self.scpi_cc[l] = cmd
 				continue
-		print(self.scpi_cc)
-		print(self.scpi_ic)
 
+			"""Parse instrument command definition"""
+
+			"""Get command level"""
+			lvl = 0
+			scpi_ic = self.scpi_ic
+			while l[lvl] == '\t':
+				scpi_ic = scpi_ic.subcmds[last_ic_cmd[lvl]]
+				lvl = lvl + 1
+			l = l[lvl:]
+			last_ic_cmd = last_ic_cmd[:lvl]
+
+			"""Split line to: CMD params [options]"""
+			l = l.replace('\t', ' ').split(' ', 1)
+			cmd = l[0].strip().split(':')
+			params = "" if len(l) == 1 else l[1]
+			params = params.strip().split('[', 1)
+			options = "" if len(params) == 1 else params[1].strip()
+			params = params[0].strip()
+
+			if not cmd[0]:
+				cmd = cmd[1:]
+			optional = False
+			if cmd[0] == '[':
+				optional = True
+				cmd = cmd[1:]
+			elif cmd[0].startswith('['):
+				optional = True
+				cmd[0] = cmd[0][1:]
+			if optional:
+				cmd[0] = cmd[0][:-1]
+			last_ic_cmd.append(cmd[0])
+			new_scpi_ic = self.SCPI_IC()
+			new_scpi_ic.setOptional(optional)
+			scpi_ic.addSubCommand(cmd[0], new_scpi_ic)
+
+
+		print(repr(self.scpi_cc))
+		print(repr(self.scpi_ic))
 
 
 if __name__ == '__main__':

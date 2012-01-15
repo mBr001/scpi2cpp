@@ -1,4 +1,5 @@
 # Instrument commands
+MEASure:VOLTage[:DC]	<channel_list>
 ROUTe
 	:CLOSe	<channel_list>
 		:STATe?
