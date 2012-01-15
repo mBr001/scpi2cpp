@@ -1,0 +1,7 @@
+# Instrument commands
+ROUTe
+	:CLOSe	<channel_list>
+		:STATe?
+	:OPEN	<channel_list>
+		:ALL	[event; no query]
+

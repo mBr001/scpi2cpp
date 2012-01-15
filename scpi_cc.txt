@@ -1,0 +1,10 @@
+# this is comment
+
+# Common commands - mandatory
+*CLS
+*ESE
+*ESE?
+*OPC
+*OPC?
+*RST
+

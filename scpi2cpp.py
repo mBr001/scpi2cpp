@@ -81,6 +81,33 @@ ${items}
 
 
 class SCPI2cpp:
+	class SCPI_IC:
+		"""SCPI instrument command item."""
+		def __init__(self):
+			self.subcmds = {}
+			"""Command is optional/default"""
+			self.optional = False
+			"""Command have query form."""
+			self.query = True
+			"""Command have imperative form."""
+			self.event = True
+
+		def addSubCommand(self, name, scpi_ic):
+			self.subcmds[name] = scpi_ic
+			scpi_ic.setParent(self)
+
+		def setEvent(self, event):
+			self.event = event
+
+		def setOptional(self, optional):
+			self.optional = optional
+
+		def setParent(self, parent_ic):
+			self.parent_ic = parent_ic
+
+		def setQuery(self, query):
+			self.query = query
+
 	def __init__(self):
 		self.scpi_spec = ""
 
@@ -96,6 +123,8 @@ classes into dest_dir."""
 		fdec = open(os.path.join(dest_dir, dec_file_name), 'w')
 		fdef = open(os.path.join(dest_dir, def_file_name), 'w')
 
+		self.parseSpecification()
+
 		c = ClassWriter(class_name)
 		c.addItem(c.prot_public, c.Item.Declaration("", class_name+"()"), """
 {
@@ -104,22 +133,51 @@ classes into dest_dir."""
 		fdec.write(c.declaration())
 		fdef.write(c.definition(dec_file_name))
 
+	def parseSpecification(self):
+		self.scpi_cc = {}
+		self.scpi_ic = {}
+		for l in self.scpi_spec.splitlines():
+			if l.startswith('#'):
+				continue
+			if l.startswith('*'):
+				l = l[1:].strip()
+				query = False
+				if l.endswith('?'):
+					l = l[:-1]
+					query = True
+				try:
+					cmd = self.scpi_cc[l]
+					if query:
+						cmd.setEvent(True)
+					else:
+						cmd.setEvent(True)
+				except KeyError:
+					cmd = self.SCPI_IC()
+					if query:
+						cmd.setEvent(False)
+					else:
+						cmd.setQuery(False)
+					self.scpi_cc[l] = cmd
+				continue
+		print(self.scpi_cc)
+		print(self.scpi_ic)
+
+
 
 if __name__ == '__main__':
 	cpp_dir = "./gen"
 	class_name = "TestDevice"
-	scpi_spec = """
-# this is comment
 
-*OPC
-ROUTe
-	:CLOSe	<channel_list>
-		:STATe?
-	:OPEN	<channel_list>
-		:ALL	[event; no query]
-"""
-	
+	cc_file_name = "scpi_cc.txt"
+	ic_file_name = "scpi_ic.txt"
+
 	scpi2cpp = SCPI2cpp()
-	scpi2cpp.addSpecification(scpi_spec)
+
+	specifiaction = open(cc_file_name).read()
+	scpi2cpp.addSpecification(specifiaction)
+
+	specifiaction = open(ic_file_name).read()
+	scpi2cpp.addSpecification(specifiaction)
+
 	scpi2cpp.generate(class_name, cpp_dir)
-	
+
