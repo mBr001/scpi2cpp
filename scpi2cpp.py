@@ -7,13 +7,14 @@ from string import Template
 class SCPISpecification:
 	class SCPI_cmd:
 		"""SCPI command item."""
+
 		def __init__(self, name):
 			"""Command have imperative form."""
 			self.event = False
 			self.name = name
-			"""Command is optional/default"""
+			"""Command is optional/default."""
 			self.optional = False
-			"""Parent for composed command"""
+			"""Parent for composed instrument command."""
 			self._parent = None
 			"""Command have query form."""
 			self.query = False
@@ -21,6 +22,7 @@ class SCPISpecification:
 			self.subcmds = {}
 
 		def addSubCommand(self, name):
+			"""Return all subcommands sorted by name."""
 			scpi_cmd = SCPISpecification.SCPI_cmd(name)
 			self.subcmds[name] = scpi_cmd
 			scpi_cmd.setParent(self)
@@ -37,6 +39,12 @@ class SCPISpecification:
 			v.sort(key = lambda x: x.name)
 			return v
 
+		def isCC(self):
+			return self.name[0] == '*'
+
+		def isIC(self):
+			return self.name[0] != '*'
+
 		def setEvent(self, event):
 			self.event = event
 
@@ -50,8 +58,7 @@ class SCPISpecification:
 			self.query = query
 
 	def __init__(self):
-		self._scpi_cc = self.SCPI_cmd(None)
-		self._scpi_ic = self.SCPI_cmd(None)
+		self._scpi_cmds = self.SCPI_cmd(None)
 	
 	def fromFile(self, file_name):
 		f = open(file_name, 'r')
@@ -61,36 +68,34 @@ class SCPISpecification:
 		self._parseSpecification(scpi_spec)
 
 	def _parseIC(self, cmd):
-		pass
+		query = False
+		if cmd.endswith('?'):
+			cmd = cmd[:-1]
+			query = True
+		cmd = cmd.upper()
+		try:
+			cmd = self._scpi_cmds.getSubCommand(cmd)
+		except KeyError:
+			cmd = self._scpi_cmds.addSubCommand(cmd)
+
+		if query:
+			cmd.setQuery(True)
+		else:
+			cmd.setEvent(True)
 
 	def _parseSpecification(self, scpi_spec):
 		last_ic_cmd = []
 		for l in scpi_spec.splitlines():
 			l = l.rstrip()
-			if l.startswith('#') or not l:
+			if not l or l.startswith('#'):
 				continue
 			if l.startswith('*'):
-				c = l[1:]
-				query = False
-				if c.endswith('?'):
-					c = c[:-1]
-					query = True
-				cmd = None
-				c = c.upper()
-				try:
-					cmd = self._scpi_cc.getSubCommand(c)
-				except KeyError:
-					cmd = self._scpi_cc.addSubCommand(c)
-
-				if query:
-					cmd.setQuery(True)
-				else:
-					cmd.setEvent(True)
+				self._parseIC(l)
 				continue
 
 			"""Parse instrument command definition"""
 
-			"""Get command level"""
+			"""Get parrent command."""
 			lvl = 0
 			scpi_ic = self._scpi_ic
 			while l[lvl] == '\t':
@@ -137,11 +142,8 @@ class SCPISpecification:
 				if not cmd:
 					break
 
-	def scpi_cc(self):
-		return self._scpi_cc.getSubCommands()
-
-	def scpi_ic(self):
-		return self._scpi_ic
+	def scpi_cmds(self):
+		return self._scpi_cmds
 
 
 class SCPI2cpp:
@@ -161,10 +163,22 @@ class SCPI2cpp:
 			pass
 		else:
 			if scpi_cmd.query:
-				cmd = cmd + scpi_cmd.name + "q(Cmd *cmd);\n"
+				cmd = cmd + scpi_cmd.name + "q(CmdBuilder *cmdBuilder);\n"
 			if scpi_cmd.event:
-				cmd = cmd + scpi_cmd.name + "e(Cmd *cmd);\n"
+				cmd = cmd + scpi_cmd.name + "e(CmdBuilder *cmdBuilder);\n"
 		return cmd + cmd_end
+
+	def _dumpCmds(self, lvl=0):
+		cmds = []
+		cc = self.scpi_spec.scpi_cmds()
+		for sub_cmd in cc.getSubCommands():
+			sep = '' if lvl == 0 else ':'
+			cmd = '\t' * lvl + sep + sub_cmd.name
+			if (sub_cmd.event):
+				cmds.append(cmd)
+			if (sub_cmd.query):
+				cmds.append(cmd + '?')
+		return '\n'.join(cmds)
 
 	def generate(self, class_name, dest_dir):
 		"""Parse SCPI specifiaction added by addSpecification(...) and write C++
@@ -175,12 +189,14 @@ classes into dest_dir."""
 		fdecl = open(os.path.join(dest_dir, decl_file_name), 'w')
 		fdef = open(os.path.join(dest_dir, def_file_name), 'w')
 
-		cmds = [self._genCmdDecl(scpi_cmd) for scpi_cmd in self.scpi_spec.scpi_cc()]
+		print(self._dumpCmds())
+		#cmds = [self._genCmdDecl(scpi_cmd) for scpi_cmd in self.scpi_spec.scpi_cc()]
 
-		for key in self.scpi_spec.scpi_ic().getSubCommands():
-			print(key.name)
+		#for key in self.scpi_spec.scpi_ic().getSubCommands():
+		#	print(key.name)
 
-		cmds = "\n".join(cmds)
+		#cmds = "\n".join(cmds)
+		return
 		fdecl.write(Template("""#pragme once
 
 #include "scpi_ifce.hh"

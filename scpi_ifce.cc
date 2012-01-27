@@ -2,15 +2,14 @@
 
 namespace SCPI {
 
-Cmd(int bufferLen)
+class CmdBuilder
 {
-	cmd.reserve(bufferLen);
-}
+	int bufferLen;
 
-const std::string & str() const
-{
-	return cmd;
-}
+public:
+	CmdBuilder(int bufferLen) : bufferLen(bufferLen) {};
+};
+
 
 }
 
