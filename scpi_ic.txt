@@ -1,8 +1,19 @@
 # Instrument commands
-MEASure:VOLTage[:DC]	<channel_list>
+[MEASure]:VOLTage[:DC]?	<channel_list>
 ROUTe
 	:CLOSe	<channel_list>
 		:STATe?
 	:OPEN	<channel_list>
-		:ALL	[event; no query]
+		:ALL
+SYSTem
+	:ERRor
+		[:NEXT]?
+	:VERSion?
+STATus
+	:OPERation
+		[:EVENt]?
+		:CONDition?
+		:ENABle
+		:ENABle?
+	:PRESet
 

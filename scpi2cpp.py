@@ -11,9 +11,9 @@ class SCPISpecification:
 		def __init__(self, name):
 			"""Command have imperative form."""
 			self.event = False
+			"""Default child command."""
+			self._default = None
 			self.name = name
-			"""Command is optional/default."""
-			self.optional = False
 			"""Parent for composed instrument command."""
 			self._parent = None
 			"""Command have query form."""
@@ -22,11 +22,14 @@ class SCPISpecification:
 			self.subcmds = {}
 
 		def addSubCommand(self, name):
-			"""Return all subcommands sorted by name."""
-			scpi_cmd = SCPISpecification.SCPI_cmd(name)
-			self.subcmds[name] = scpi_cmd
-			scpi_cmd.setParent(self)
-			return scpi_cmd
+			"""Return subcommand, if does not exists create new."""
+			try:
+				return self.getSubCommand(name)
+			except KeyError:
+				scpi_cmd = SCPISpecification.SCPI_cmd(name)
+				scpi_cmd.setParent(self)
+				self.subcmds[name] = scpi_cmd
+				return scpi_cmd
 
 		def getParent(self):
 			return self._parent
@@ -35,6 +38,7 @@ class SCPISpecification:
 			return self.subcmds[name]
 
 		def getSubCommands(self):
+			"""Return all subcommands sorted by name."""
 			v = [x for x in self.subcmds.values()]
 			v.sort(key = lambda x: x.name)
 			return v
@@ -45,11 +49,16 @@ class SCPISpecification:
 		def isIC(self):
 			return self.name[0] != '*'
 
+		def isOptional(self):
+			if not self._parent:
+				return False
+			return self._parent._default == self
+
 		def setEvent(self, event):
 			self.event = event
 
-		def setOptional(self, optional):
-			self.optional = optional
+		def setOptional(self):
+			self._parent._default = self
 
 		def setParent(self, scpi_cmd):
 			self._parent = scpi_cmd
@@ -59,7 +68,7 @@ class SCPISpecification:
 
 	def __init__(self):
 		self._scpi_cmds = self.SCPI_cmd(None)
-	
+
 	def fromFile(self, file_name):
 		f = open(file_name, 'r')
 		self.fromString(f.read())
@@ -67,80 +76,76 @@ class SCPISpecification:
 	def fromString(self, scpi_spec):
 		self._parseSpecification(scpi_spec)
 
-	def _parseIC(self, cmd):
+	def _parseCC(self, cmd):
 		query = False
 		if cmd.endswith('?'):
 			cmd = cmd[:-1]
 			query = True
 		cmd = cmd.upper()
-		try:
-			cmd = self._scpi_cmds.getSubCommand(cmd)
-		except KeyError:
-			cmd = self._scpi_cmds.addSubCommand(cmd)
-
+		cmd = self._scpi_cmds.addSubCommand(cmd)
 		if query:
 			cmd.setQuery(True)
 		else:
 			cmd.setEvent(True)
 
+	def _parseIC(self, cmd):
+		"""Parse instrument command definition"""
+
+		"""Get parrent command."""
+		lvl = 0
+		while cmd[lvl] == '\t':
+			lvl = lvl + 1
+		cmd = cmd[lvl:]
+		while lvl < self._last_ic_lvl:
+			self._last_ic_lvl = self._last_ic_lvl - 1
+			self._last_ic_cmd = self._last_ic_cmd.getParent()
+		if lvl > self._last_ic_lvl:
+			raise ValueError('Invalid tab indendation, level of command (%i) is greater than level of parent (%i).'
+					% (lvl, self._last_ic_lvl))
+
+		"""Separate CMD from rest of line: CMD | params"""
+		cmd = cmd.replace('\t', ' ').split(' ', 1)
+		params = "" if len(cmd) == 1 else cmd[1].strip()
+		cmd = cmd[0].strip()
+
+		while cmd:
+			optional = (cmd[0] == '[')
+			cmd_name = None
+			if optional:
+				cmd_name, cmd = cmd[1:].split(']', 1)
+			else:
+				x = 1
+				while x < len(cmd):
+					if not (cmd[x].isalnum() or cmd[x] == '_'):
+						break
+					x = x + 1
+				cmd_name, cmd = cmd[:x], cmd[x:]
+			if cmd_name[0] == ':':
+				cmd_name = cmd_name[1:]
+			cmd_name = cmd_name.upper()
+
+			self._last_ic_lvl = self._last_ic_lvl + 1
+			self._last_ic_cmd = self._last_ic_cmd.addSubCommand(cmd_name)
+			if optional:
+				self._last_ic_cmd.setOptional()
+			"""This is just lower level of command in command tree"""
+			if cmd == '?':
+				self._last_ic_cmd.setQuery(True)
+				break
+			if not cmd:
+				self._last_ic_cmd.setEvent(True)
+
 	def _parseSpecification(self, scpi_spec):
-		last_ic_cmd = []
+		self._last_ic_cmd = self._scpi_cmds
+		self._last_ic_lvl = 0
 		for l in scpi_spec.splitlines():
 			l = l.rstrip()
 			if not l or l.startswith('#'):
 				continue
 			if l.startswith('*'):
-				self._parseIC(l)
+				self._parseCC(l)
 				continue
-
-			"""Parse instrument command definition"""
-
-			"""Get parrent command."""
-			lvl = 0
-			scpi_ic = self._scpi_ic
-			while l[lvl] == '\t':
-				scpi_ic = scpi_ic.subcmds[last_ic_cmd[lvl]]
-				lvl = lvl + 1
-			l = l[lvl:]
-			last_ic_cmd = last_ic_cmd[:lvl]
-
-			"""Split line to: CMD params [options]"""
-			l = l.replace('\t', ' ').split(' ', 1)
-			cmd = l[0].strip()
-			params = "" if len(l) == 1 else l[1]
-			params = params.strip().split('[', 1)
-			options = "" if len(params) == 1 else params[1].strip()
-			params = params[0].strip()
-
-			while True:
-				optional = (cmd[0] == '[')
-				c = None
-				if optional:
-					c, cmd = cmd.split(']', 1)
-				else:
-					a = cmd.find(':', 1)
-					b = cmd.find('[', 1)
-					x = len(cmd)
-					if a >= 0:
-						x = a
-					if b >= 0 and b < x:
-						x = b
-					c, cmd = cmd[:x], cmd[x:]
-				if c[0] == ':':
-					c = c[1:]
-				query = True
-				event = True
-				if c[-1] == '?':
-					event = False
-				
-				c = c.upper()
-				last_ic_cmd.append(c)
-				new_scpi_ic = scpi_ic.addSubCommand(c)
-				new_scpi_ic.setEvent(event)
-				new_scpi_ic.setOptional(optional)
-				new_scpi_ic.setQuery(query)
-				if not cmd:
-					break
+			self._parseIC(l)
 
 	def scpi_cmds(self):
 		return self._scpi_cmds
@@ -159,7 +164,7 @@ class SCPI2cpp:
 				cmd = 'namespace ' + parent.name + '{\n' + cmd
 				cmd_end = cmd_end + '}\n'
 			parent = parent.getParent()
-		if scpi_cmd.optional:
+		if scpi_cmd.isOptional():
 			pass
 		else:
 			if scpi_cmd.query:
@@ -168,16 +173,27 @@ class SCPI2cpp:
 				cmd = cmd + scpi_cmd.name + "e(CmdBuilder *cmdBuilder);\n"
 		return cmd + cmd_end
 
-	def _dumpCmds(self, lvl=0):
+	def _dumpCmds(self, scpi_cmds=None, lvl=0):
 		cmds = []
-		cc = self.scpi_spec.scpi_cmds()
-		for sub_cmd in cc.getSubCommands():
+		if scpi_cmds is None:
+			scpi_cmds = self.scpi_spec.scpi_cmds()
+
+		for sub_cmd in scpi_cmds.getSubCommands():
 			sep = '' if lvl == 0 else ':'
-			cmd = '\t' * lvl + sep + sub_cmd.name
-			if (sub_cmd.event):
+			cmd = None
+			if sub_cmd.isOptional():
+				cmd = '\t' * lvl + '[' + sep + sub_cmd.name + ']'
+			else:
+				cmd = '\t' * lvl + sep + sub_cmd.name
+			if sub_cmd.event:
 				cmds.append(cmd)
-			if (sub_cmd.query):
+			if sub_cmd.query:
 				cmds.append(cmd + '?')
+			if not sub_cmd.event and not sub_cmd.query:
+				cmds.append(cmd)
+			sub_dump = self._dumpCmds(sub_cmd, lvl + 1)
+			if sub_dump:
+				cmds.append(sub_dump)
 		return '\n'.join(cmds)
 
 	def generate(self, class_name, dest_dir):
