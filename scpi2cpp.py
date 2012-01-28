@@ -106,6 +106,7 @@ class SCPISpecification:
 		"""Separate CMD from rest of line: CMD | params"""
 		cmd = cmd.replace('\t', ' ').split(' ', 1)
 		params = "" if len(cmd) == 1 else cmd[1].strip()
+		params = self._parseICParams(params)
 		cmd = cmd[0].strip()
 
 		while cmd:
@@ -134,6 +135,19 @@ class SCPISpecification:
 				break
 			if not cmd:
 				self._last_ic_cmd.setEvent(True)
+
+	def _parseICParams(self, params):
+		while params:
+			if params[0].isalpha():
+				pass
+			elif params[0] == '<':
+				pass
+			elif params[0] == '(':
+				pass
+			elif params[0] == '[':
+				pass
+			else
+				raise BagrError()
 
 	def _parseSpecification(self, scpi_spec):
 		self._last_ic_cmd = self._scpi_cmds
