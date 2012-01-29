@@ -1,0 +1,17 @@
+# this is comment
+
+# Common commands - mandatory
+*CLS
+*ESE
+*ESE?
+*OPC
+*OPC?
+*RST
+
+# Instrument commands
+#[:MEASure]:VOLTage[:DC]?	<channel_list>
+[:MEASure]:VOLTage[:DC]?
+	:CURRent?
+	:RESisitance
+		:AAA
+
