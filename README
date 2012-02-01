@@ -1,4 +1,7 @@
-Script converting SCPI command specification for instrument
-into C++ classed to encapsulate comand generation.
+Create C++ code based on SCPI specification for device.
 
-Released under Apache license v 2
+Released under Apache license version 2
+
+This project is currently just experiment and under heavy development,
+is not stable nor (much) usable.
+
