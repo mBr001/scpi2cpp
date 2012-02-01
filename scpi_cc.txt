@@ -1,10 +1,15 @@
-# this is comment
+# This common commands are mandatory by IEEE 488.2
 
-# Common commands - mandatory
 *CLS
 *ESE
 *ESE?
+*ESR?
 *OPC
 *OPC?
 *RST
+*SRE
+*SRE?
+*STB?
+*TST?
+*WAI
 

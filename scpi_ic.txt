@@ -1,16 +1,16 @@
-# Instrument commands
-[MEASure]:VOLTage[:DC]?	<channel_list>
-ROUTe
-	:CLOSe	<channel_list>
-		:STATe?
-	:OPEN	<channel_list>
-		:ALL
+# This instrument commands are mandatory for all SCPI compliant devices.
+
 SYSTem
 	:ERRor
 		[:NEXT]?
 	:VERSion?
 STATus
 	:OPERation
+		[:EVENt]?
+		:CONDition?
+		:ENABle
+		:ENABle?
+	:QUEStionable
 		[:EVENt]?
 		:CONDition?
 		:ENABle
