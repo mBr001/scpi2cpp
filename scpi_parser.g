@@ -77,15 +77,34 @@ parser ParserDescription:
 		{{ return IC }}
 
 	rule ICommandParams: {{ params = [] }}
-		( ( ICommandParam WSS {{ params.append(ICommandParam) }})
-			( COMMA WSS ICommandParam WSS
-				{{ params.append(ICommandParam) }})*
+		( ( ICommandParam {{ params.append(ICommandParam) }})
+			( ICommandParamNext
+				{{ params.append(ICommandParamNext) }} |
+			  ICommandParamNextOpt
+				{{ params.append(ICommandParamNextOpt) }} )*
 			)?
 		{{ return params }}
 
 	rule ICommandParam:
 		ChannelList {{ return ChannelList }} |
-		ParamValueList {{ return ParamValueList }}
+		ParamValueList {{ return ParamValueList }} |
+		ICommandParamOne {{ return ICommandParamOne }}
+
+	rule ICommandParamOne: {{ param = {} }}
+		"1" WSS
+		{{ param["type"] = "const" }}
+		{{ param["value"] = "1" }}
+		{{ return param }}
+
+	rule ICommandParamNext:
+		COMMA WSS ICommandParam
+		{{ return ICommandParam }}
+
+	rule ICommandParamNextOpt: {{ param = {} }}
+		LSB WSS COMMA WSS ICommandParams RSB WSS
+		{{ param["type"] = "optional" }}
+		{{ param["subparams"] = ICommandParams }}
+		{{ return param }}
 
 	rule ICommandSub:
 		(ICommand {{ return ICommand }} )?
@@ -99,12 +118,12 @@ parser ParserDescription:
 		(LCB WSS
 		( TYPE WSS {{ values.append(TYPE) }} )
 		( OR WSS TYPE WSS {{ values.append(TYPE) }} )*
-		RCB)?
+		RCB WSS)?
 		{{ return values }}
 
 	rule ChannelList: {{ param = {} }}
 		{{ param["type"] = "channels" }}
-		CHLIST ParamValueType RP
+		CHLIST ParamValueType RP WSS
 		{{ param["value type"] = ParamValueType }}
 		{{ return param }}
 
@@ -119,7 +138,7 @@ parser ParserDescription:
 		)
 		( OR WSS ParamValueSpecial
 			{{ param["values special"].append(ParamValueSpecial) }} )*
-		RCB
+		RCB WSS
 		{{ return param }}
 
 	rule ParamValueSpecial:
