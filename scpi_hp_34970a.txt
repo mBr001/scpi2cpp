@@ -2,3 +2,7 @@
 #
 # Commands for specific cards are included in separate files.
 
+:ROUTe
+	:SCAN (@<scan_list>)
+	:SCAN?
+

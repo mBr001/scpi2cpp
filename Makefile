@@ -1,7 +1,12 @@
 
 YAPPS2 = yapps2-2.1.1-17.1/yapps2.py
 
-test: scpi_parser.py
+test: test_parser
+
+test_parser: scpi_hp_34970a.txt |  scpi_parser.py
+	python scpi_parser.py SCPI $^
+
+test_builder: scpi_parser.py
 	python3 scpi2cpp.py
 	#@echo "=========== HH ==========="
 	#@cat gen/testdevice.hh

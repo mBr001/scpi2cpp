@@ -1,6 +1,6 @@
-# SCPI commands for HP34903 card (used in HP34901)
+# SCPI commands specific for HP34903
 
-ROUTe
+:ROUTe
 	:CLOSe	<channel_list>
 		:STATe?
 	:OPEN	<channel_list>

@@ -6,7 +6,9 @@ parser ParserDescription:
 	token EOF:   "$"
 	token CC:    '[*][A-Z][A-Z][A-Z]'
 	token IC:    ':[A-Z][A-Z][A-Z]?[A-Z]?[a-z]*[0-9]*'
+	token TYPE:  '<[a-zA-Z_][a-zA-Z0-9_]*>'
 	token AT:    '[@]'
+	token CHLIST:'\\([@]'
 	token LP:    '\\('
 	token RP:    '\\)'
 	token LB:    '\\['
@@ -23,12 +25,12 @@ parser ParserDescription:
 	rule SCPI:
 	    	Commands EOF
 		{{ return Commands }}
-	
+
 	rule Commands: {{ commands = [] }}
 		( COMMENT | EOL | ( Command {{ commands.append(Command) }} EOL ) )*
 	    	( Command {{ commands.append(Command) }} )?
 	    	{{ return commands }}
-	
+
 	rule Command:
 		CCommand {{ return CCommand }} |
 		ICommand {{ return ICommand }}
@@ -38,7 +40,7 @@ parser ParserDescription:
 		{{ command['name'] = CC }}
 		{{ command['query'] = Query }}
 		{{ return command }}
-	
+
 	rule ICommand: {{ command = {} }}
 		TABS ICommandName ICommandSub Query ICommandParams
 		{{ command['indent'] = len(TABS) }}
@@ -54,15 +56,31 @@ parser ParserDescription:
 		{{ return command }}
 
 	rule ICommandParams: {{ params = [] }}
+		( WS+ ( ICommandParam {{ params.append(ICommandParam) }})?
+		( WS* ICommandParam "[ \t]*," {{ params.append(ICommandParam) }})*
+			)?
 		{{ return params }}
-		
-	rule Query:
-		{{ QUEST = False }}
-		QUEST?
-		{{ return bool(QUEST) }}
-	
+
+	rule ICommandParam: {{ param = {} }}
+		ChannelList
+		{{ return ChannelList }}
+
 	rule ICommandSub:
 		{{ ICommand = None }}
 		ICommand?
 		{{ return ICommand }}
+
+	rule Query:
+		{{ QUEST = False }}
+		QUEST?
+		{{ return bool(QUEST) }}
+
+
+	rule ChannelList:
+		CHLIST ParamType RP
+		{{ return ParamType }}
+
+	rule ParamType:
+		TYPE
+		{{ return TYPE }}
 
