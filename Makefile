@@ -4,7 +4,7 @@ YAPPS2 = yapps2-2.1.1-17.1/yapps2.py
 test: test_parser
 
 test_parser: scpi_hp_34970a.txt |  scpi_parser.py
-	python scpi_parser.py SCPI $^
+	python scpi_parser.py SCPI $^ | python3 pp.py
 
 test_builder: scpi_parser.py
 	python3 scpi2cpp.py

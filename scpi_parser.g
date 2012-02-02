@@ -4,30 +4,38 @@ parser ParserDescription:
 #	ignore:      '\\\r?\n'
 	token COMMENT: "[#].*?\r?\n"
 	token EOF:   "$"
-	token CC:    '[*][A-Z][A-Z][A-Z]'
-	token IC:    ':[A-Z][A-Z][A-Z]?[A-Z]?[a-z]*[0-9]*'
+	token CC:    '[A-Z][A-Z][A-Z]'
+	token IC:    '[A-Z][A-Z][A-Z]?[A-Z]?[a-z]*[0-9]*'
+	token NAME:  '[a-zA-Z_][a-zA-Z0-9_]*'
 	token TYPE:  '<[a-zA-Z_][a-zA-Z0-9_]*>'
 	token AT:    '[@]'
 	token CHLIST:'\\([@]'
 	token LP:    '\\('
 	token RP:    '\\)'
-	token LB:    '\\['
-	token RB:    '\\]'
+	token LT:    '<'
+	token GT:    '>'
+	token LSB:   '\\['
+	token RSB:   '\\]'
+	token LCB:   '{'
+	token RCB:   '}'
 	token OR:    '[|]'
 	token TABS:  '[\t]*'
 	token EOL:   '[ \t]*\r?\n'
 	token WS:    '[ \t]'
+	token WSS:   '[ \t]*'
 	token STAR:  '[*]'
 	token PLUS:  '[+]'
 	token QUEST: '[?]'
-	token COLON: ':'
+	token COMMA: '[,]'
+	token STAR:  '[*]'
+	token COLON: '[:]'
 
 	rule SCPI:
 	    	Commands EOF
 		{{ return Commands }}
 
 	rule Commands: {{ commands = [] }}
-		( COMMENT | EOL | ( Command {{ commands.append(Command) }} EOL ) )*
+		( COMMENT | EOL | ( Command EOL {{ commands.append(Command) }} ) )*
 	    	( Command {{ commands.append(Command) }} )?
 	    	{{ return commands }}
 
@@ -36,51 +44,87 @@ parser ParserDescription:
 		ICommand {{ return ICommand }}
 
 	rule CCommand: {{ command = {} }}
-		CC Query
-		{{ command['name'] = CC }}
-		{{ command['query'] = Query }}
+		STAR CC Query
+		{{ command["name"] = CC }}
+		{{ command["query"] = Query }}
+		{{ command["type"] = "CC" }}
 		{{ return command }}
 
 	rule ICommand: {{ command = {} }}
-		TABS ICommandName ICommandSub Query ICommandParams
-		{{ command['indent'] = len(TABS) }}
-		{{ command.update(ICommandName) }}
-		{{ command['child'] = ICommandSub }}
-		{{ command['query'] = Query }}
-		{{ command['params'] = ICommandParams }}
+		TABS ICommandTree Query
+		( WS+ ( ICommandParams
+			{{ command["params"] = ICommandParams }} )? )?
+		{{ command["indent"] = len(TABS) }}
+		{{ command["query"] = Query }}
+		{{ command["tree"] = ICommandTree }}
+		{{ command["type"] = "IC" }}
 		{{ return command }}
 
-	rule ICommandName: {{ command = {} }}
-		( IC {{ command['name'] = IC }} |
-		LB IC RB {{ command['name'] = IC; command['optional'] = True }} )
+	rule ICommandTree:
+		ICommandBranch {{ command = ICommandBranch }}
+		( ICommandTree {{ command["sub"] = ICommandTree }} )?
 		{{ return command }}
+
+	rule ICommandBranch: {{ command = {} }}
+		( ICommandName {{ command["name"] = ICommandName }} ) |
+		( LSB ICommandName RSB
+			{{ command["name"] = ICommandName }}
+			{{ command["optional"] = True }} )
+		{{ return command }}
+
+	rule ICommandName:
+		COLON IC
+		{{ return IC }}
 
 	rule ICommandParams: {{ params = [] }}
-		( WS+ ( ICommandParam {{ params.append(ICommandParam) }})?
-		( WS* ICommandParam "[ \t]*," {{ params.append(ICommandParam) }})*
+		( ( ICommandParam WSS {{ params.append(ICommandParam) }})
+			( COMMA WSS ICommandParam WSS
+				{{ params.append(ICommandParam) }})*
 			)?
 		{{ return params }}
 
-	rule ICommandParam: {{ param = {} }}
-		ChannelList
-		{{ return ChannelList }}
+	rule ICommandParam:
+		ChannelList {{ return ChannelList }} |
+		ParamValueList {{ return ParamValueList }}
 
 	rule ICommandSub:
-		{{ ICommand = None }}
-		ICommand?
-		{{ return ICommand }}
+		(ICommand {{ return ICommand }} )?
+		{{ return None }}
 
 	rule Query:
-		{{ QUEST = False }}
-		QUEST?
-		{{ return bool(QUEST) }}
+		( QUEST {{ return True }} )?
+		{{ return False }}
 
+	rule ValueList: {{ values = [] }}
+		(LCB WSS
+		( TYPE WSS {{ values.append(TYPE) }} )
+		( OR WSS TYPE WSS {{ values.append(TYPE) }} )*
+		RCB)?
+		{{ return values }}
 
-	rule ChannelList:
-		CHLIST ParamType RP
-		{{ return ParamType }}
+	rule ChannelList: {{ param = {} }}
+		{{ param["type"] = "channels" }}
+		CHLIST ParamValueType RP
+		{{ param["value type"] = ParamValueType }}
+		{{ return param }}
 
-	rule ParamType:
-		TYPE
-		{{ return TYPE }}
+	rule ParamValueList: {{ param = {} }}
+		{{ param["type"] = "list" }}
+		{{ param["values special"] = [] }}
+		LCB WSS
+		( ( ParamValueType
+			{{ param["value type"] = ParamValueType }} ) |
+		  ( ParamValueSpecial
+			{{ param["values special"].append(ParamValueSpecial) }} )
+		)
+		( OR WSS ParamValueSpecial
+			{{ param["values special"].append(ParamValueSpecial) }} )*
+		RCB
+		{{ return param }}
+
+	rule ParamValueSpecial:
+		NAME WSS {{ return NAME }}
+
+	rule ParamValueType:
+		LT NAME GT WSS {{ return NAME }}
 
