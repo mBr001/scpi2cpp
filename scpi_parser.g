@@ -1,7 +1,6 @@
 
 parser ParserDescription:
 
-#	ignore:      '\\\r?\n'
 	token COMMENT: "[#].*?\r?\n"
 	token EOF:   "$"
 	token CC:    '[A-Z][A-Z][A-Z]'

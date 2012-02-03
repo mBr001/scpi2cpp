@@ -4,13 +4,26 @@
 
 :CONFigure
 	:TEMPerature	{TCouple|RTD|FRTD|THERmistor|DEF}, {<type>|DEF} [,1 [, {<resolution>|MIN|MAX|DEF}]], (@<scan_list>)
-	:VOLTage[:DC]	[{<range>|AUTO|MIN|MAX|DEF}[,{<resolution>|MIN|MAX|DEF}]] ,(@<scan_list>)
+	:VOLTage[:DC]	[{<range>|AUTO|MIN|MAX|DEF}[, {<resolution>|MIN|MAX|DEF}]] ,(@<scan_list>)
+	:RESistance	[{<range>|AUTO|MIN|MAX|DEF}[, {<resolution>|MIN|MAX|DEF}]] ,(@<scan_list>)
+:CONFigure?	[(@<ch_list>)]
+
+:INITiate
+
+:READ?
 
 :ROUTe
-	:SCAN (@<scan_list>)
+	:CLOSe	(@<ch_list>)
+		:EXCLusive	(@<ch_list>)
+	:CLOSe?	(@<ch_list>)
+	:OPEN	(@<ch_list>)
+	:OPEN?	[(@<ch_list>)]
+	:SCAN	(@<scan_list>)
 	:SCAN?
 
+:SYSTem:REMote
+
 :TRIGger
-	:SOURce	{ BUS | IMMediate | EXTernal | ALARm1 | ALARm2 | ALARm3 | ALARm4 | TIMer }
+	:SOURce	{BUS|IMMediate|EXTernal|ALARm1|ALARm2|ALARm3|ALARm4|TIMer}
 	:SOURce?
 
