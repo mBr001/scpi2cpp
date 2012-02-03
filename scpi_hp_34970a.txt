@@ -4,7 +4,7 @@
 
 :CONFigure
 	:TEMPerature	{TCouple|RTD|FRTD|THERmistor|DEF}, {<type>|DEF} [,1 [, {<resolution>|MIN|MAX|DEF}]], (@<scan_list>)
-
+	:VOLTage[:DC]	[{<range>|AUTO|MIN|MAX|DEF}[,{<resolution>|MIN|MAX|DEF}]] ,(@<scan_list>)
 
 :ROUTe
 	:SCAN (@<scan_list>)

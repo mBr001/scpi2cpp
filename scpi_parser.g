@@ -66,10 +66,10 @@ parser ParserDescription:
 		{{ return command }}
 
 	rule ICommandBranch: {{ command = {} }}
-		( ICommandName {{ command["name"] = ICommandName }} ) |
+		( ( ICommandName {{ command["name"] = ICommandName }} ) |
 		( LSB ICommandName RSB
 			{{ command["name"] = ICommandName }}
-			{{ command["optional"] = True }} )
+			{{ command["optional"] = True }} ) )
 		{{ return command }}
 
 	rule ICommandName:
@@ -77,7 +77,9 @@ parser ParserDescription:
 		{{ return IC }}
 
 	rule ICommandParams: {{ params = [] }}
-		( ( ICommandParam {{ params.append(ICommandParam) }})
+		( ( ICommandParam {{ params.append(ICommandParam) }} |
+			ICommandParamOpt {{ params.append(ICommandParamOpt) }}
+			)
 			( ICommandParamNext
 				{{ params.append(ICommandParamNext) }} |
 			  ICommandParamNextOpt
@@ -90,10 +92,10 @@ parser ParserDescription:
 		ParamValueList {{ return ParamValueList }} |
 		ICommandParamOne {{ return ICommandParamOne }}
 
-	rule ICommandParamOne: {{ param = {} }}
-		"1" WSS
-		{{ param["type"] = "const" }}
-		{{ param["value"] = "1" }}
+	rule ICommandParamOpt: {{ param = {} }}
+		LSB WSS ICommandParams RSB WSS
+		{{ param["type"] = "optional" }}
+		{{ param["subparams"] = ICommandParams }}
 		{{ return param }}
 
 	rule ICommandParamNext:
@@ -104,6 +106,12 @@ parser ParserDescription:
 		LSB WSS COMMA WSS ICommandParams RSB WSS
 		{{ param["type"] = "optional" }}
 		{{ param["subparams"] = ICommandParams }}
+		{{ return param }}
+
+	rule ICommandParamOne: {{ param = {} }}
+		"1" WSS
+		{{ param["type"] = "const" }}
+		{{ param["value"] = "1" }}
 		{{ return param }}
 
 	rule ICommandSub:
